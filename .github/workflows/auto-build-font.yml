@@ -65,17 +65,31 @@ jobs:
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Checkout gh-pages branch
-          git fetch origin gh-pages || git checkout gh-pages || git checkout --orphan gh-pages
-          git rm -rf .
+          
+          # Check if gh-pages branch exists remotely
+          if git ls-remote --exit-code --heads origin gh-pages > /dev/null 2>&1; then
+            # gh-pages exists, check it out
+            git fetch origin gh-pages
+            git checkout gh-pages
+          else
+            # gh-pages doesn't exist, create it as orphan
+            git checkout --orphan gh-pages
+          fi
+          
+          # Clear all files except the .git directory
+          git rm -rf . 2>/dev/null || true
+          
           # Copy font to a subfolder
           mkdir -p fonts
           cp dist/TwemojiCountryFlags.woff2 fonts/TwemojiCountryFlags.woff2
           git add fonts/TwemojiCountryFlags.woff2
+          
           # Commit only if there are changes
-          if [ -n "$(git status --porcelain fonts/TwemojiCountryFlags.woff2)" ]; then
+          if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Deploy TwemojiCountryFlags.woff2 from JoeBlakeB/ttf-twemoji-aur release ${{ steps.get_release.outputs.latest_release }}"
             git push origin gh-pages
+          else
+            echo "No changes to deploy"
           fi
       # Store the new release tag
       - name: Store New Release Tag
