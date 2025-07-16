@@ -81,7 +81,6 @@ jobs:
           # Copy font to a subfolder
           mkdir -p fonts
           cp dist/TwemojiCountryFlags.woff2 fonts/TwemojiCountryFlags.woff2
-          # Force add despite .gitignore
           git add fonts/TwemojiCountryFlags.woff2
           # Commit only if there are changes
           if [ -n "$(git status --porcelain fonts/TwemojiCountryFlags.woff2)" ]; then
