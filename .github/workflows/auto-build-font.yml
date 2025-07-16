@@ -1,0 +1,95 @@
+name: Check jdecked/twemoji Releases and Build Font
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Runs every Sunday at midnight UTC (2:00 AM CEST during summer)
+  workflow_dispatch: # Allows manual triggering for testing
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout your repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Install fonttools and curl
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonttools curl
+
+      # Set up Node.js for npm
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Adjust to match your project's Node.js version
+
+      # Install npm dependencies
+      - name: Install npm Dependencies
+        run: npm install
+
+      # Download previous release tag (if exists)
+      - name: Download Previous Release Tag
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: auto-build-font.yml
+          name: twemoji-release-tag
+          if_no_artifact_found: warn
+        continue-on-error: true
+
+      # Fetch the latest release tag from jdecked/twemoji
+      - name: Get Latest Release Tag
+        id: get_release
+        run: |
+          LATEST_RELEASE=$(curl -s -H "Authorization: Bearer ${{ secrets.PAT }}" \
+            https://api.github.com/repos/jdecked/twemoji/releases/latest | jq -r '.tag_name // "none"')
+          echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          echo "Latest release: $LATEST_RELEASE"
+
+      # Compare with previous release tag
+      - name: Compare Releases
+        id: compare_releases
+        run: |
+          PREVIOUS_RELEASE=$(cat twemoji-release-tag 2>/dev/null || echo "none")
+          echo "Previous release: $PREVIOUS_RELEASE"
+          if [ "${{ steps.get_release.outputs.latest_release }}" != "$PREVIOUS_RELEASE" ]; then
+            echo "release_changed=true" >> $GITHUB_OUTPUT
+            echo "Release changed: true"
+          else
+            echo "release_changed=false" >> $GITHUB_OUTPUT
+            echo "Release changed: false"
+          fi
+
+      # Run font generation if release changed
+      - name: Generate Font
+        if: steps.compare_releases.outputs.release_changed == 'true'
+        run: |
+          npm run make-font
+          ls -la dist/TwemojiCountryFlags.woff2
+
+      # Store the new release tag
+      - name: Store New Release Tag
+        if: steps.compare_releases.outputs.release_changed == 'true'
+        run: |
+          echo "${{ steps.get_release.outputs.latest_release }}" > twemoji-release-tag
+
+      # Upload the new release tag as an artifact
+      - name: Upload Release Tag
+        if: steps.compare_releases.outputs.release_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: twemoji-release-tag
+          path: twemoji-release-tag
+
+      # Commit and push the generated font
+      - name: Commit and Push Font
+        if: steps.compare_releases.outputs.release_changed == 'true'
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist/TwemojiCountryFlags.woff2
+          git commit -m "Update TwemojiCountryFlags.woff2 from jdecked/twemoji release ${{ steps.get_release.outputs.latest_release }}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
