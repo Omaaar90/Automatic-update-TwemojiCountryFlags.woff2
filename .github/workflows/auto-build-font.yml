@@ -53,6 +53,47 @@ jobs:
             echo "release_changed=false" >> $GITHUB_OUTPUT
             echo "Release changed: false"
           fi
+      # Download the TTF file from the latest release
+      - name: Download TTF File
+        if: steps.compare_releases.outputs.release_changed == 'true'
+        run: |
+          # Get the latest release info
+          RELEASE_INFO=$(curl -s -H "Authorization: Bearer ${{ secrets.PAT }}" \
+            https://api.github.com/repos/JoeBlakeB/ttf-twemoji-aur/releases/latest)
+          
+          # Debug: Show available assets
+          echo "Available assets:"
+          echo "$RELEASE_INFO" | jq -r '.assets[]?.name // empty'
+          
+          # Extract the TTF asset URL - try multiple patterns to be safe
+          TTF_ASSET_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[]? | select(.name | test("^Twemoji-.*\\.ttf$")) | .browser_download_url' | head -n1)
+          
+          # If the first pattern doesn't work, try a more general one
+          if [ -z "$TTF_ASSET_URL" ] || [ "$TTF_ASSET_URL" = "null" ]; then
+            echo "First pattern failed, trying general TTF pattern..."
+            TTF_ASSET_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[]? | select(.name | endswith(".ttf")) | .browser_download_url' | head -n1)
+          fi
+          
+          if [ -z "$TTF_ASSET_URL" ] || [ "$TTF_ASSET_URL" = "null" ]; then
+            echo "Error: Could not find TTF asset in the latest release"
+            exit 1
+          fi
+          
+          echo "Downloading TTF from: $TTF_ASSET_URL"
+          
+          # Create build directory if it doesn't exist
+          mkdir -p build
+          
+          # Download the TTF file to a known location
+          curl --location "$TTF_ASSET_URL" --output build/twemoji-source.ttf
+          
+          # Verify the file was downloaded
+          if [ ! -f build/twemoji-source.ttf ]; then
+            echo "Error: Failed to download TTF file"
+            exit 1
+          fi
+          
+          echo "TTF file downloaded successfully ($(stat -c%s build/twemoji-source.ttf) bytes)"
       # Run font generation if release changed
       - name: Generate Font
         if: steps.compare_releases.outputs.release_changed == 'true'
