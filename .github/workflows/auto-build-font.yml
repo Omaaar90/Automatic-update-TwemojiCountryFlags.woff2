@@ -75,8 +75,7 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # Checkout gh-pages branch
-          git fetch origin gh-pages
-          git checkout gh-pages || git checkout --orphan gh-pages
+          git fetch origin gh-pages || git checkout gh-pages || git checkout --orphan gh-pages
           git rm -rf .
           # Copy font to a subfolder
           mkdir -p fonts
