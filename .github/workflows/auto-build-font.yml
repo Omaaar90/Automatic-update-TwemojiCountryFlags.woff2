@@ -33,7 +33,7 @@ jobs:
         id: download-artifact
         uses: dawidd6/action-download-artifact@v3
         with:
-          workflow: check-twemoji.yml
+          workflow: auto-build-font.yml
           name: twemoji-release-tag
           if_no_artifact_found: warn
         continue-on-error: true
@@ -81,7 +81,7 @@ jobs:
           mkdir -p fonts
           cp dist/TwemojiCountryFlags.woff2 fonts/TwemojiCountryFlags.woff2
           # Force add despite .gitignore
-          git add -f fonts/TwemojiCountryFlags.woff2
+          git add fonts/TwemojiCountryFlags.woff2
           # Commit only if there are changes
           if [ -n "$(git status --porcelain fonts/TwemojiCountryFlags.woff2)" ]; then
             git commit -m "Deploy TwemojiCountryFlags.woff2 from jdecked/twemoji release ${{ steps.get_release.outputs.latest_release }}"
