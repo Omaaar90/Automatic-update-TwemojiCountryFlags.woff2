@@ -33,7 +33,7 @@ jobs:
         id: download-artifact
         uses: dawidd6/action-download-artifact@v3
         with:
-          workflow: auto-build-font.yml
+          workflow: check-twemoji.yml
           name: twemoji-release-tag
           if_no_artifact_found: warn
         continue-on-error: true
@@ -68,6 +68,26 @@ jobs:
           npm run make-font
           ls -la dist/TwemojiCountryFlags.woff2
 
+      # Deploy font to gh-pages
+      - name: Deploy to GitHub Pages
+        if: steps.compare_releases.outputs.release_changed == 'true'
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Checkout gh-pages branch
+          git fetch origin gh-pages
+          git checkout gh-pages || git checkout --orphan gh-pages
+          # Copy font to a subfolder
+          mkdir -p fonts
+          cp dist/TwemojiCountryFlags.woff2 fonts/TwemojiCountryFlags.woff2
+          # Force add despite .gitignore
+          git add -f fonts/TwemojiCountryFlags.woff2
+          # Commit only if there are changes
+          if [ -n "$(git status --porcelain fonts/TwemojiCountryFlags.woff2)" ]; then
+            git commit -m "Deploy TwemojiCountryFlags.woff2 from jdecked/twemoji release ${{ steps.get_release.outputs.latest_release }}"
+            git push origin gh-pages
+          fi
+
       # Store the new release tag
       - name: Store New Release Tag
         if: steps.compare_releases.outputs.release_changed == 'true'
@@ -81,15 +101,3 @@ jobs:
         with:
           name: twemoji-release-tag
           path: twemoji-release-tag
-
-      # Commit and push the generated font
-      - name: Commit and Push Font
-        if: steps.compare_releases.outputs.release_changed == 'true'
-        run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add dist/TwemojiCountryFlags.woff2
-          git commit -m "Update TwemojiCountryFlags.woff2 from jdecked/twemoji release ${{ steps.get_release.outputs.latest_release }}"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT }}
